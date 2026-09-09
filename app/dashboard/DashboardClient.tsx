@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import QRCodeStyling, { DotType, CornerSquareType } from 'qr-code-styling';
+import JSZip from 'jszip';
 import ClickTime from './ClickTime';
 import { signOutAction } from '../actions';
 import QrThumbnail from './QrThumbnail';
@@ -56,6 +57,7 @@ export default function DashboardClient({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [confirmingBulk, setConfirmingBulk] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   async function handleDelete(id: number, slug: string) {
@@ -102,7 +104,7 @@ export default function DashboardClient({
     }
   }
 
-  function handleQuickDownload(link: LinkInfo) {
+  function buildQrInstance(link: LinkInfo) {
     const url = `${window.location.origin}/${link.slug}`;
 
     let image = '';
@@ -122,7 +124,7 @@ export default function DashboardClient({
       }
     }
 
-    const qr = new QRCodeStyling({
+    return new QRCodeStyling({
       width: 300,
       height: 300,
       data: url,
@@ -136,8 +138,35 @@ export default function DashboardClient({
       imageOptions: { crossOrigin: 'anonymous' as const, margin: 8, imageSize: 0.4 },
       qrOptions: { errorCorrectionLevel: (image ? 'H' : 'M') as 'H' | 'M' },
     });
+  }
 
-    qr.download({ name: `qr-${link.slug}`, extension: 'png' });
+  function handleQuickDownload(link: LinkInfo) {
+    buildQrInstance(link).download({ name: `qr-${link.slug}`, extension: 'png' });
+  }
+
+  async function handleBulkDownload() {
+    setBulkDownloading(true);
+    try {
+      const targets = linksState.filter((l) => selectedIds.has(l.id));
+      const zip = new JSZip();
+
+      await Promise.all(
+        targets.map(async (link) => {
+          const blob = await buildQrInstance(link).getRawData('png');
+          if (blob) zip.file(`qr-${link.slug}.png`, blob as Blob);
+        })
+      );
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const zipUrl = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = zipUrl;
+      a.download = 'qr-codes.zip';
+      a.click();
+      URL.revokeObjectURL(zipUrl);
+    } finally {
+      setBulkDownloading(false);
+    }
   }
 
   function handleEditSave(id: number, updated: EditableLink) {
@@ -326,8 +355,16 @@ export default function DashboardClient({
                 </button>
               </span>
             ) : (
-              <span className="flex items-center gap-3 text-xs">
+              <span className="flex flex-wrap items-center gap-3 text-xs">
                 <span className="text-text-muted">{selectedIds.size} selected</span>
+                <button
+                  type="button"
+                  onClick={handleBulkDownload}
+                  disabled={bulkDownloading}
+                  className="text-olive hover:underline disabled:opacity-60"
+                >
+                  {bulkDownloading ? 'Zipping…' : 'Download selected'}
+                </button>
                 <button
                   type="button"
                   onClick={() => setConfirmingBulk(true)}
