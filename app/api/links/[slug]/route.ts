@@ -38,7 +38,11 @@ export async function PATCH(
   const access = await checkAccess(slug);
   if (access.error) return access.error;
 
-  const { dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji } = await req.json();
+  const currentResult = await db.query('SELECT * FROM links WHERE slug = $1', [slug]);
+  const current = currentResult.rows[0];
+
+  const body = await req.json();
+  const { destinationUrl, newSlug, dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji } = body;
 
   if (logoDataUrl && logoDataUrl.length > MAX_LOGO_LENGTH) {
     return NextResponse.json(
@@ -47,14 +51,37 @@ export async function PATCH(
     );
   }
 
+  const finalUrl = destinationUrl?.trim() || current.destination_url;
+  const finalSlug = newSlug?.trim() || current.slug;
+
+  if (finalSlug !== current.slug) {
+    const existing = await db.query('SELECT id FROM links WHERE slug = $1', [finalSlug]);
+    if (existing.rows.length > 0) {
+      return NextResponse.json(
+        { error: 'That custom link is already taken, try another.' },
+        { status: 400 }
+      );
+    }
+  }
+
   await db.query(
     `UPDATE links
-     SET dot_style = $1, corner_style = $2, fg_color = $3, bg_color = $4, logo_data_url = $5, emoji = $6
-     WHERE slug = $7`,
-    [dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl || null, emoji || null, slug]
+     SET destination_url = $1, slug = $2, dot_style = $3, corner_style = $4, fg_color = $5, bg_color = $6, logo_data_url = $7, emoji = $8
+     WHERE id = $9`,
+    [
+      finalUrl,
+      finalSlug,
+      dotStyle ?? current.dot_style,
+      cornerStyle ?? current.corner_style,
+      fgColor ?? current.fg_color,
+      bgColor ?? current.bg_color,
+      logoDataUrl !== undefined ? logoDataUrl || null : current.logo_data_url,
+      emoji !== undefined ? emoji || null : current.emoji,
+      current.id,
+    ]
   );
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, slug: finalSlug });
 }
 
 export async function DELETE(
