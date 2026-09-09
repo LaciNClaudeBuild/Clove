@@ -5,22 +5,32 @@ import QRCodeStyling, { DotType, CornerSquareType } from 'qr-code-styling';
 const dotStyles: DotType[] = ['square', 'rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded'];
 const cornerStyles: CornerSquareType[] = ['square', 'dot', 'extra-rounded'];
 
+function formatLabel(value: string): string {
+  const words = value.split('-');
+  return words[0][0].toUpperCase() + words[0].slice(1) + (words[1] ? ' ' + words[1] : '');
+}
+
 export default function Home() {
   const [url, setUrl] = useState('');
   const [customSlug, setCustomSlug] = useState('');
   const [result, setResult] = useState('');
+  const [copied, setCopied] = useState(false);
   const [dotStyle, setDotStyle] = useState<DotType>('square');
   const [cornerStyle, setCornerStyle] = useState<CornerSquareType>('square');
-  const [fgColor, setFgColor] = useState('#000000');
-  const [bgColor, setBgColor] = useState('#ffffff');
+  const [fgColor, setFgColor] = useState('#4a3f35');
+  const [bgColor, setBgColor] = useState('#fffdf9');
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [emoji, setEmoji] = useState('');
 
   const qrRef = useRef<HTMLDivElement>(null);
   const qrInstance = useRef<QRCodeStyling | null>(null);
 
+  const isError = result && !result.startsWith('http');
+  const isSuccess = result && result.startsWith('http');
+
   async function createLink(e: React.FormEvent) {
     e.preventDefault();
+    setCopied(false);
     const res = await fetch('/api/links', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,7 +65,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!result || !result.startsWith('http')) return;
+    if (!isSuccess) return;
 
     let image = '';
     if (logoDataUrl) image = logoDataUrl;
@@ -64,8 +74,8 @@ export default function Home() {
     const hasImage = !!image;
 
     const options = {
-      width: 300,
-      height: 300,
+      width: 260,
+      height: 260,
       data: result,
       image: image || undefined,
       dotsOptions: { color: fgColor, type: dotStyle },
@@ -84,93 +94,207 @@ export default function Home() {
     } else {
       qrInstance.current.update(options);
     }
-  }, [result, dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji]);
+  }, [result, isSuccess, dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji]);
 
   function download(extension: 'png' | 'svg') {
     qrInstance.current?.download({ name: 'qr-code', extension });
   }
 
+  function copyResult() {
+    navigator.clipboard.writeText(result);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
-    <main style={{ padding: 40, fontFamily: 'sans-serif', maxWidth: 500 }}>
-      <h1>Tender</h1>
-      <form onSubmit={createLink}>
-        <input
-          type="url"
-          placeholder="Paste a URL"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          required
-          style={{ padding: 8, width: 300, display: 'block', marginBottom: 8 }}
-        />
-        <input
-          type="text"
-          placeholder="Custom back-half (optional)"
-          value={customSlug}
-          onChange={(e) => setCustomSlug(e.target.value)}
-          style={{ padding: 8, width: 300, display: 'block', marginBottom: 8 }}
-        />
-        <button type="submit" style={{ padding: 8 }}>
-          Shorten
-        </button>
-      </form>
-
-      {result && !result.startsWith('http') && (
-        <p style={{ marginTop: 16, color: 'red' }}>{result}</p>
-      )}
-
-      {result && result.startsWith('http') && (
-        <div style={{ marginTop: 24 }}>
-          <p>{result}</p>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 4 }}>Dot style</label>
-            <select value={dotStyle} onChange={(e) => setDotStyle(e.target.value as DotType)}>
-              {dotStyles.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-
-            <label style={{ display: 'block', margin: '8px 0 4px' }}>Corner style</label>
-            <select value={cornerStyle} onChange={(e) => setCornerStyle(e.target.value as CornerSquareType)}>
-              {cornerStyles.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-
-            <label style={{ display: 'block', margin: '8px 0 4px' }}>Foreground color</label>
-            <input type="color" value={fgColor} onChange={(e) => setFgColor(e.target.value)} />
-
-            <label style={{ display: 'block', margin: '8px 0 4px' }}>Background color</label>
-            <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
-
-            <label style={{ display: 'block', margin: '8px 0 4px' }}>Logo image (optional)</label>
-            <input type="file" accept="image/*" onChange={handleLogoUpload} />
-
-            <label style={{ display: 'block', margin: '8px 0 4px' }}>Or emoji (optional)</label>
-            <input
-              type="text"
-              placeholder="e.g. 🌿"
-              value={emoji}
-              onChange={(e) => {
-                setEmoji(e.target.value);
-                setLogoDataUrl('');
-              }}
-              style={{ width: 60, padding: 4 }}
-            />
+    <main className="flex flex-1 justify-center px-6 py-16">
+      <div className="w-full max-w-lg">
+        <div className="rounded-[20px] border border-border bg-cream p-8 shadow-[0_1px_2px_rgba(74,63,53,0.06),0_10px_28px_rgba(74,63,53,0.08)]">
+          <div className="mb-8 text-center">
+            <h1 className="font-serif text-3xl text-text">Tender</h1>
+            <p className="mt-2 text-sm text-text-muted">
+              Paste a link to shorten it and build a matching QR code.
+            </p>
           </div>
 
-          <div ref={qrRef}></div>
+          <form onSubmit={createLink} className="space-y-3">
+            <div>
+              <label htmlFor="url" className="mb-1.5 block text-sm text-text">
+                Destination URL
+              </label>
+              <input
+                id="url"
+                type="url"
+                placeholder="https://example.com/your-page"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-olive focus:outline-none focus:ring-2 focus:ring-olive/25"
+              />
+            </div>
+            <div>
+              <label htmlFor="slug" className="mb-1.5 block text-sm text-text">
+                Custom back-half (optional)
+              </label>
+              <input
+                id="slug"
+                type="text"
+                placeholder="my-link"
+                value={customSlug}
+                onChange={(e) => setCustomSlug(e.target.value)}
+                className="w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text placeholder:text-text-muted focus:border-olive focus:outline-none focus:ring-2 focus:ring-olive/25"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-terracotta px-4 py-3 text-sm font-medium text-cream transition-colors hover:bg-terracotta-hover"
+            >
+              Shorten
+            </button>
+          </form>
 
-          <div style={{ marginTop: 12 }}>
-            <button onClick={() => download('png')} style={{ marginRight: 8, padding: 8 }}>
-              Download PNG
-            </button>
-            <button onClick={() => download('svg')} style={{ padding: 8 }}>
-              Download SVG
-            </button>
-          </div>
+          {isError && (
+            <p className="mt-4 rounded-xl border border-terracotta/30 bg-terracotta/10 px-4 py-3 text-sm text-terracotta-hover">
+              {result}
+            </p>
+          )}
         </div>
-      )}
+
+        {isSuccess && (
+          <div className="mt-4 rounded-[20px] border border-border bg-cream p-8 shadow-[0_1px_2px_rgba(74,63,53,0.06),0_10px_28px_rgba(74,63,53,0.08)]">
+            <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3">
+              <a
+                href={result}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate text-sm text-olive hover:underline"
+              >
+                {result}
+              </a>
+              <button
+                onClick={copyResult}
+                className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text transition-colors hover:bg-sand"
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <p className="mb-2 text-sm text-text">Dot style</p>
+                <div className="flex flex-wrap gap-2">
+                  {dotStyles.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setDotStyle(s)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                        dotStyle === s
+                          ? 'border-terracotta bg-terracotta text-cream'
+                          : 'border-border bg-white text-text hover:bg-sand'
+                      }`}
+                    >
+                      {formatLabel(s)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm text-text">Corner style</p>
+                <div className="flex flex-wrap gap-2">
+                  {cornerStyles.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setCornerStyle(s)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                        cornerStyle === s
+                          ? 'border-terracotta bg-terracotta text-cream'
+                          : 'border-border bg-white text-text hover:bg-sand'
+                      }`}
+                    >
+                      {formatLabel(s)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-sm text-text">
+                  <input
+                    type="color"
+                    value={fgColor}
+                    onChange={(e) => setFgColor(e.target.value)}
+                    className="h-8 w-8 cursor-pointer rounded-lg border border-border bg-transparent p-0.5"
+                  />
+                  Foreground
+                </label>
+                <label className="flex items-center gap-2 text-sm text-text">
+                  <input
+                    type="color"
+                    value={bgColor}
+                    onChange={(e) => setBgColor(e.target.value)}
+                    className="h-8 w-8 cursor-pointer rounded-lg border border-border bg-transparent p-0.5"
+                  />
+                  Background
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="cursor-pointer rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-medium text-text transition-colors hover:bg-sand">
+                  Upload logo
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                </label>
+                <span className="text-xs text-text-muted">or</span>
+                <input
+                  type="text"
+                  placeholder="🌿"
+                  value={emoji}
+                  onChange={(e) => {
+                    setEmoji(e.target.value);
+                    setLogoDataUrl('');
+                  }}
+                  className="w-16 rounded-lg border border-border bg-white px-3 py-1.5 text-center text-sm focus:border-olive focus:outline-none focus:ring-2 focus:ring-olive/25"
+                />
+                {(logoDataUrl || emoji) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLogoDataUrl('');
+                      setEmoji('');
+                    }}
+                    className="text-xs text-text-muted hover:text-text"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col items-center gap-4 border-t border-border pt-6">
+              <div
+                ref={qrRef}
+                className="flex h-[260px] w-[260px] items-center justify-center overflow-hidden rounded-xl border border-border bg-white"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => download('png')}
+                  className="rounded-xl bg-olive px-4 py-2.5 text-sm font-medium text-cream transition-colors hover:bg-olive-hover"
+                >
+                  Download PNG
+                </button>
+                <button
+                  onClick={() => download('svg')}
+                  className="rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-text transition-colors hover:bg-sand"
+                >
+                  Download SVG
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
