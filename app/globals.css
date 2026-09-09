@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Soft autumn / boho-Apple palette */
+  --color-sand: #f4ede4;
+  --color-cream: #fffdf9;
+  --color-terracotta: #c97a54;
+  --color-terracotta-hover: #b5673f;
+  --color-olive: #6e7b4f;
+  --color-olive-hover: #5c6841;
+  --color-border: #e4d9c9;
+  --color-text: #4a3f35;
+  --color-text-muted: #8a7a6a;
+
+  --background: var(--color-sand);
+  --foreground: var(--color-text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-sand: var(--color-sand);
+  --color-cream: var(--color-cream);
+  --color-terracotta: var(--color-terracotta);
+  --color-terracotta-hover: var(--color-terracotta-hover);
+  --color-olive: var(--color-olive);
+  --color-olive-hover: var(--color-olive-hover);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --font-serif: var(--font-source-serif);
+  --font-sans: var(--font-public-sans);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Georgia, serif;
+}
+
+/* Subtle linen texture for the page background â€” the one bit of
+   material warmth this design leans on, kept quiet everywhere else. */
+.bg-linen {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(74, 63, 53, 0.05) 1px, transparent 0);
+  background-size: 18px 18px;
 }
