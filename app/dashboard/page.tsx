@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import ClickTime from './ClickTime';
+import { signOutAction } from '../actions';
 
 export default async function Dashboard() {
   const session = await auth();
@@ -40,10 +41,15 @@ export default async function Dashboard() {
 
   return (
     <main style={{ padding: 40, fontFamily: 'sans-serif' }}>
-      <div className="mb-6 flex justify-end">
+      <div className="mb-6 flex items-center justify-end gap-4">
         <a href="/" className="text-sm text-olive hover:underline">
           Generator
         </a>
+        <form action={signOutAction}>
+          <button type="submit" className="text-sm text-text-muted hover:underline">
+            Sign out
+          </button>
+        </form>
       </div>
       <h1>Dashboard</h1>
       {isAdmin && <p style={{ color: '#888', marginBottom: 20 }}>Viewing all links (admin)</p>}
