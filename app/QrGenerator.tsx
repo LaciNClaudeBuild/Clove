@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import QRCodeStyling, { DotType, CornerSquareType } from 'qr-code-styling';
+import { signOutAction } from './actions';
 
 const dotStyles: DotType[] = ['square', 'rounded', 'dots', 'classy', 'classy-rounded', 'extra-rounded'];
 const cornerStyles: CornerSquareType[] = ['square', 'dot', 'extra-rounded'];
@@ -14,6 +15,7 @@ export default function QrGenerator() {
   const [url, setUrl] = useState('');
   const [customSlug, setCustomSlug] = useState('');
   const [result, setResult] = useState('');
+  const [slug, setSlug] = useState('');
   const [copied, setCopied] = useState(false);
   const [dotStyle, setDotStyle] = useState<DotType>('square');
   const [cornerStyle, setCornerStyle] = useState<CornerSquareType>('square');
@@ -21,6 +23,8 @@ export default function QrGenerator() {
   const [bgColor, setBgColor] = useState('#fffdf9');
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [emoji, setEmoji] = useState('');
+  const [logoError, setLogoError] = useState('');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const qrRef = useRef<HTMLDivElement>(null);
   const qrInstance = useRef<QRCodeStyling | null>(null);
@@ -38,15 +42,39 @@ export default function QrGenerator() {
     });
     const data = await res.json();
     setResult(data.shortUrl || data.error);
+    setSlug(data.slug || '');
   }
+
+  const MAX_LOGO_DIMENSION = 300;
+  const MAX_LOGO_LENGTH = 250_000; // roughly 180KB of actual image data
 
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setLogoError('');
+
     const reader = new FileReader();
     reader.onload = () => {
-      setLogoDataUrl(reader.result as string);
-      setEmoji('');
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, MAX_LOGO_DIMENSION / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const resized = canvas.toDataURL('image/png');
+
+        if (resized.length > MAX_LOGO_LENGTH) {
+          setLogoError('That logo is too large even after resizing. Try a simpler image.');
+          return;
+        }
+
+        setLogoDataUrl(resized);
+        setEmoji('');
+      };
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   }
@@ -96,8 +124,21 @@ export default function QrGenerator() {
     }
   }, [result, isSuccess, dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji]);
 
-  function download(extension: 'png' | 'svg') {
+  async function download(extension: 'png' | 'svg') {
     qrInstance.current?.download({ name: 'qr-code', extension });
+
+    if (!slug) return;
+    setSaveState('saving');
+    try {
+      const res = await fetch(`/api/links/${slug}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji }),
+      });
+      setSaveState(res.ok ? 'saved' : 'error');
+    } catch {
+      setSaveState('error');
+    }
   }
 
   function copyResult() {
@@ -109,10 +150,15 @@ export default function QrGenerator() {
   return (
     <main className="flex flex-1 justify-center px-6 py-16">
       <div className="w-full max-w-lg">
-        <div className="mb-4 flex justify-end px-1">
+        <div className="mb-4 flex items-center justify-end gap-4 px-1">
           <a href="/dashboard" className="text-sm text-olive hover:underline">
             Dashboard
           </a>
+          <form action={signOutAction}>
+            <button type="submit" className="text-sm text-text-muted hover:text-text hover:underline">
+              Sign out
+            </button>
+          </form>
         </div>
 
         <div className="rounded-[20px] border border-border bg-cream p-8 shadow-[0_1px_2px_rgba(74,63,53,0.06),0_10px_28px_rgba(74,63,53,0.08)]">
@@ -276,6 +322,7 @@ export default function QrGenerator() {
                   </button>
                 )}
               </div>
+              {logoError && <p className="text-xs text-terracotta-hover">{logoError}</p>}
             </div>
 
             <div className="mt-6 flex flex-col items-center gap-4 border-t border-border pt-6">
@@ -297,6 +344,13 @@ export default function QrGenerator() {
                   Download SVG
                 </button>
               </div>
+              {saveState === 'saving' && <p className="text-xs text-text-muted">Saving this style to your link…</p>}
+              {saveState === 'saved' && <p className="text-xs text-olive">Saved to your links</p>}
+              {saveState === 'error' && (
+                <p className="text-xs text-terracotta-hover">
+                  Downloaded, but couldn&apos;t save the style to your link. You can still find the link on your dashboard.
+                </p>
+              )}
             </div>
           </div>
         )}
