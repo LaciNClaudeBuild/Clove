@@ -16,10 +16,10 @@ export default async function Dashboard() {
 
   const linksResult = isAdmin
     ? await db.query(
-        'SELECT id, slug, destination_url, created_at, owner_email FROM links ORDER BY created_at DESC'
+        'SELECT id, slug, destination_url, created_at, owner_email, dot_style, corner_style, fg_color, bg_color, logo_data_url, emoji FROM links ORDER BY created_at DESC'
       )
     : await db.query(
-        'SELECT id, slug, destination_url, created_at, owner_email FROM links WHERE owner_email = $1 ORDER BY created_at DESC',
+        'SELECT id, slug, destination_url, created_at, owner_email, dot_style, corner_style, fg_color, bg_color, logo_data_url, emoji FROM links WHERE owner_email = $1 ORDER BY created_at DESC',
         [session.user!.email]
       );
 
@@ -41,6 +41,12 @@ export default async function Dashboard() {
     ownerEmail: link.owner_email,
     createdAt: new Date(link.created_at).toISOString(),
     totalClicks: Number(clicksByLink[link.id]?.total || 0),
+    dotStyle: link.dot_style as string | null,
+    cornerStyle: link.corner_style as string | null,
+    fgColor: link.fg_color as string | null,
+    bgColor: link.bg_color as string | null,
+    logoDataUrl: link.logo_data_url as string | null,
+    emoji: link.emoji as string | null,
     clicks: (clicksByLink[link.id]?.clicks || []) as {
       country: string | null;
       city: string | null;
