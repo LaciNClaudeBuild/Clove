@@ -12,7 +12,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       from: "onboarding@resend.dev",
     }),
   ],
-  pages: {
-    signIn: "/sign-in",
-  },
+ 
 })
