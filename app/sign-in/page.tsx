@@ -9,7 +9,7 @@ export default async function SignInPage({
 
   async function signInWithGoogle() {
     "use server";
-    await signIn("google", { redirectTo: "/dashboard" });
+    await signIn("google", { redirectTo: "/" });
   }
 
   async function signInWithEmail(formData: FormData) {
@@ -50,7 +50,7 @@ export default async function SignInPage({
         </div>
 
         <form action={signInWithEmail} className="space-y-3">
-          <input type="hidden" name="redirectTo" value="/dashboard" />
+          <input type="hidden" name="redirectTo" value="/" />
           <div>
             <label htmlFor="email" className="mb-1.5 block text-sm text-text">
               Email address
