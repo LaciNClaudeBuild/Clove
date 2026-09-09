@@ -14,8 +14,7 @@ export default async function SignInPage({
 
   async function signInWithEmail(formData: FormData) {
     "use server";
-    const email = formData.get("email");
-    await signIn("resend", { email, redirectTo: "/dashboard" });
+    await signIn("resend", formData);
   }
 
   return (
@@ -51,6 +50,7 @@ export default async function SignInPage({
         </div>
 
         <form action={signInWithEmail} className="space-y-3">
+          <input type="hidden" name="redirectTo" value="/dashboard" />
           <div>
             <label htmlFor="email" className="mb-1.5 block text-sm text-text">
               Email address
