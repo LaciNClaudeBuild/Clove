@@ -40,7 +40,10 @@ export default function EditLinkPanel({
     (link.cornerStyle as CornerSquareType) || 'square'
   );
   const [fgColor, setFgColor] = useState(link.fgColor || '#4a3f35');
-  const [bgColor, setBgColor] = useState(link.bgColor || '#fffdf9');
+  const [bgColor, setBgColor] = useState(
+    link.bgColor && link.bgColor !== 'transparent' ? link.bgColor : '#fffdf9'
+  );
+  const [transparentBg, setTransparentBg] = useState(link.bgColor === 'transparent');
   const [logoDataUrl, setLogoDataUrl] = useState(link.logoDataUrl || '');
   const [emoji, setEmoji] = useState(link.emoji || '');
   const [logoError, setLogoError] = useState('');
@@ -108,7 +111,7 @@ export default function EditLinkPanel({
       data: url,
       image: image || undefined,
       dotsOptions: { color: fgColor, type: dotStyle },
-      backgroundOptions: { color: bgColor },
+      backgroundOptions: { color: transparentBg ? 'transparent' : bgColor },
       cornersSquareOptions: { type: cornerStyle },
       imageOptions: { crossOrigin: 'anonymous' as const, margin: 6, imageSize: 0.4 },
       qrOptions: { errorCorrectionLevel: (image ? 'H' : 'M') as 'H' | 'M' },
@@ -121,11 +124,12 @@ export default function EditLinkPanel({
     } else {
       qrInstance.current.update(options);
     }
-  }, [slug, dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji, link.slug]);
+  }, [slug, dotStyle, cornerStyle, fgColor, bgColor, transparentBg, logoDataUrl, emoji, link.slug]);
 
   async function saveLink(): Promise<boolean> {
     setSaving(true);
     setFormError('');
+    const effectiveBgColor = transparentBg ? 'transparent' : bgColor;
     try {
       const res = await fetch(`/api/links/${link.slug}`, {
         method: 'PATCH',
@@ -136,7 +140,7 @@ export default function EditLinkPanel({
           dotStyle,
           cornerStyle,
           fgColor,
-          bgColor,
+          bgColor: effectiveBgColor,
           logoDataUrl,
           emoji,
         }),
@@ -152,7 +156,7 @@ export default function EditLinkPanel({
         dotStyle,
         cornerStyle,
         fgColor,
-        bgColor,
+        bgColor: effectiveBgColor,
         logoDataUrl,
         emoji,
       });
@@ -233,7 +237,7 @@ export default function EditLinkPanel({
             </div>
           </div>
 
-          <div className="flex gap-6">
+          <div className="flex flex-wrap items-center gap-6">
             <label className="flex items-center gap-2 text-sm text-text">
               <input
                 type="color"
@@ -243,14 +247,26 @@ export default function EditLinkPanel({
               />
               Foreground
             </label>
-            <label className="flex items-center gap-2 text-sm text-text">
+            <label
+              className={`flex items-center gap-2 text-sm ${transparentBg ? 'text-text-muted' : 'text-text'}`}
+            >
               <input
                 type="color"
                 value={bgColor}
                 onChange={(e) => setBgColor(e.target.value)}
-                className="h-7 w-7 cursor-pointer rounded-lg border border-border bg-transparent p-0.5"
+                disabled={transparentBg}
+                className="h-7 w-7 cursor-pointer rounded-lg border border-border bg-transparent p-0.5 disabled:cursor-not-allowed disabled:opacity-40"
               />
               Background
+            </label>
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={transparentBg}
+                onChange={(e) => setTransparentBg(e.target.checked)}
+                className="h-4 w-4 rounded border-border accent-olive"
+              />
+              Transparent
             </label>
           </div>
 
