@@ -1,20 +1,16 @@
 import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import ClickTime from './ClickTime';
-import { signOutAction } from '../actions';
+import DashboardClient from './DashboardClient';
 
 export default async function Dashboard() {
   const session = await auth();
 
   if (!session?.user?.email) {
-    redirect('/api/auth/signin');
+    redirect('/sign-in');
   }
 
-  const userResult = await db.query(
-    'SELECT role FROM users WHERE email = $1',
-    [session.user.email]
-  );
+  const userResult = await db.query('SELECT role FROM users WHERE email = $1', [session.user!.email]);
   const role = userResult.rows[0]?.role || 'member';
   const isAdmin = role === 'admin';
 
@@ -24,9 +20,8 @@ export default async function Dashboard() {
       )
     : await db.query(
         'SELECT id, slug, destination_url, created_at, owner_email FROM links WHERE owner_email = $1 ORDER BY created_at DESC',
-        [session.user.email]
+        [session.user!.email]
       );
-  const links = linksResult.rows;
 
   const clicksResult = await db.query(
     `SELECT link_id, COUNT(*) as total,
@@ -34,47 +29,26 @@ export default async function Dashboard() {
      FROM clicks GROUP BY link_id`
   );
 
-  const clicksByLink: Record<number, any> = {};
+  const clicksByLink: Record<number, { total: string; clicks: unknown[] }> = {};
   for (const row of clicksResult.rows) {
     clicksByLink[row.link_id] = row;
   }
 
-  return (
-    <main style={{ padding: 40, fontFamily: 'sans-serif' }}>
-      <div className="mb-6 flex items-center justify-end gap-4">
-        <a href="/" className="text-sm text-olive hover:underline">
-          Generator
-        </a>
-        <form action={signOutAction}>
-          <button type="submit" className="text-sm text-text-muted hover:underline">
-            Sign out
-          </button>
-        </form>
-      </div>
-      <h1>Dashboard</h1>
-      {isAdmin && <p style={{ color: '#888', marginBottom: 20 }}>Viewing all links (admin)</p>}
-      {links.map((link) => {
-        const stats = clicksByLink[link.id];
-        return (
-          <div key={link.id} style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16, borderRadius: 8 }}>
-            <p><strong>/{link.slug}</strong> → {link.destination_url}</p>
-            {isAdmin && <p style={{ fontSize: 13, color: '#888' }}>Owner: {link.owner_email}</p>}
-            <p>Total clicks: {stats ? stats.total : 0}</p>
-            {stats && (
-              <details>
-                <summary>Recent clicks</summary>
-                <ul>
-                  {stats.clicks.slice(0, 10).map((c: any, i: number) => (
-                    <li key={i}>
-                      <ClickTime iso={c.created_at} /> — {c.city || 'Unknown location'}, {c.country || ''} — {c.device_type} / {c.browser}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </div>
-        );
-      })}
-    </main>
-  );
+  const links = linksResult.rows.map((link) => ({
+    id: link.id,
+    slug: link.slug,
+    destinationUrl: link.destination_url,
+    ownerEmail: link.owner_email,
+    createdAt: new Date(link.created_at).toISOString(),
+    totalClicks: Number(clicksByLink[link.id]?.total || 0),
+    clicks: (clicksByLink[link.id]?.clicks || []) as {
+      country: string | null;
+      city: string | null;
+      device_type: string;
+      browser: string;
+      created_at: string;
+    }[],
+  }));
+
+  return <DashboardClient links={links} isAdmin={isAdmin} userEmail={session.user!.email!} />;
 }
