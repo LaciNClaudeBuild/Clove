@@ -123,7 +123,7 @@ export default function EditLinkPanel({
     }
   }, [slug, dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji, link.slug]);
 
-  async function handleSave() {
+  async function saveLink(): Promise<boolean> {
     setSaving(true);
     setFormError('');
     try {
@@ -144,7 +144,7 @@ export default function EditLinkPanel({
       const data = await res.json();
       if (!res.ok) {
         setFormError(data.error || 'Something went wrong.');
-        return;
+        return false;
       }
       onSave({
         slug: data.slug,
@@ -156,11 +156,18 @@ export default function EditLinkPanel({
         logoDataUrl,
         emoji,
       });
+      return true;
     } catch {
       setFormError('Something went wrong. Try again.');
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleDownload(extension: 'png' | 'svg') {
+    qrInstance.current?.download({ name: 'qr-code', extension });
+    await saveLink();
   }
 
   return (
@@ -289,19 +296,35 @@ export default function EditLinkPanel({
 
       {formError && <p className="text-xs text-terracotta-hover">{formError}</p>}
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={handleSave}
+          onClick={() => handleDownload('png')}
           disabled={saving}
           className="rounded-xl bg-olive px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-olive-hover disabled:opacity-60"
         >
-          {saving ? 'Saving…' : 'Save changes'}
+          Download PNG
+        </button>
+        <button
+          type="button"
+          onClick={() => handleDownload('svg')}
+          disabled={saving}
+          className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-text transition-colors hover:bg-sand disabled:opacity-60"
+        >
+          Download SVG
+        </button>
+        <button
+          type="button"
+          onClick={saveLink}
+          disabled={saving}
+          className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-text transition-colors hover:bg-sand disabled:opacity-60"
+        >
+          {saving ? 'Saving…' : 'Save without downloading'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-text transition-colors hover:bg-sand"
+          className="rounded-xl px-4 py-2 text-sm font-medium text-text-muted transition-colors hover:text-text"
         >
           Cancel
         </button>
