@@ -45,12 +45,28 @@ export default function DashboardClient({
   isAdmin: boolean;
   userEmail: string;
 }) {
+  const [linksState, setLinksState] = useState(links);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [viewFilter, setViewFilter] = useState<'all' | 'mine'>('all');
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  async function handleDelete(id: number, slug: string) {
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/links/${slug}`, { method: 'DELETE' });
+      if (res.ok) {
+        setLinksState((prev) => prev.filter((l) => l.id !== id));
+      }
+    } finally {
+      setDeletingId(null);
+      setConfirmingId(null);
+    }
+  }
 
   const filtered = useMemo(() => {
-    let list = links;
+    let list = linksState;
 
     if (isAdmin && viewFilter === 'mine') {
       list = list.filter((l) => l.ownerEmail === userEmail);
@@ -73,7 +89,7 @@ export default function DashboardClient({
     }
 
     return sorted;
-  }, [links, isAdmin, viewFilter, search, sortBy]);
+  }, [linksState, isAdmin, viewFilter, search, sortBy]);
 
   const totalClicksFiltered = filtered.reduce((sum, l) => sum + l.totalClicks, 0);
   const topLink = filtered.reduce<LinkInfo | null>((top, l) => {
@@ -177,11 +193,11 @@ export default function DashboardClient({
         {filtered.length === 0 && (
           <div className="rounded-[20px] border border-border bg-cream p-8 text-center">
             <p className="text-sm text-text-muted">
-              {links.length === 0
+              {linksState.length === 0
                 ? "You haven't created a link yet."
                 : 'No links match your search.'}
             </p>
-            {links.length === 0 && (
+            {linksState.length === 0 && (
               <a
                 href="/"
                 className="mt-4 inline-block rounded-xl bg-terracotta px-4 py-2.5 text-sm font-medium text-cream transition-colors hover:bg-terracotta-hover"
@@ -217,6 +233,36 @@ export default function DashboardClient({
                 {isAdmin && (
                   <p className="mt-1 text-xs text-text-muted">Owner: {link.ownerEmail}</p>
                 )}
+                <div className="mt-2">
+                  {confirmingId === link.id ? (
+                    <span className="inline-flex items-center gap-2 text-xs">
+                      <span className="text-text-muted">Delete this link?</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(link.id, link.slug)}
+                        disabled={deletingId === link.id}
+                        className="text-terracotta-hover hover:underline"
+                      >
+                        {deletingId === link.id ? 'Deleting…' : 'Yes, delete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingId(null)}
+                        className="text-text-muted hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingId(link.id)}
+                      className="text-xs text-text-muted hover:text-terracotta-hover hover:underline"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
                 {link.clicks.length > 0 && (
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs text-olive hover:underline">
