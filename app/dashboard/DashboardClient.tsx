@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import QRCodeStyling, { DotType, CornerSquareType } from 'qr-code-styling';
 import JSZip from 'jszip';
 import ClickTime from './ClickTime';
@@ -39,6 +39,49 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: 'alpha', label: 'A–Z' },
 ];
 
+function getSparklineCounts(clicks: ClickInfo[], today: Date): number[] {
+  const days: number[] = new Array(7).fill(0);
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  clicks.forEach((c) => {
+    const iso = c.created_at.endsWith('Z') ? c.created_at : `${c.created_at}Z`;
+    const clickDate = new Date(iso);
+    const clickDayStart = new Date(clickDate.getFullYear(), clickDate.getMonth(), clickDate.getDate());
+    const diffDays = Math.round((todayStart.getTime() - clickDayStart.getTime()) / 86_400_000);
+    if (diffDays >= 0 && diffDays < 7) {
+      days[6 - diffDays] += 1;
+    }
+  });
+
+  return days;
+}
+
+function getTopLocations(clicks: ClickInfo[]): [string, number][] {
+  const counts = new Map<string, number>();
+  clicks.forEach((c) => {
+    const label = c.country || 'Unknown';
+    counts.set(label, (counts.get(label) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+}
+
+function Sparkline({ counts }: { counts: number[] }) {
+  const max = Math.max(1, ...counts);
+  return (
+    <div className="flex items-end gap-0.5" style={{ height: 16 }} title="Clicks over the last 7 days">
+      {counts.map((c, i) => (
+        <div
+          key={i}
+          className="w-1 rounded-sm bg-olive/60"
+          style={{ height: `${Math.max(2, (c / max) * 16)}px` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardClient({
   links,
   isAdmin,
@@ -58,6 +101,11 @@ export default function DashboardClient({
   const [confirmingBulk, setConfirmingBulk] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [today, setToday] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setToday(new Date());
+  }, []);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   async function handleDelete(id: number, slug: string) {
@@ -425,12 +473,25 @@ export default function DashboardClient({
                     <span className="font-medium">/{link.slug}</span>{' '}
                     <span className="text-text-muted">→ {link.destinationUrl}</span>
                   </p>
-                  <span className="shrink-0 text-xs text-text-muted">
-                    {link.totalClicks} click{link.totalClicks === 1 ? '' : 's'}
+                  <span className="flex shrink-0 items-center gap-2">
+                    {today && link.clicks.length > 0 && (
+                      <Sparkline counts={getSparklineCounts(link.clicks, today)} />
+                    )}
+                    <span className="text-xs text-text-muted">
+                      {link.totalClicks} click{link.totalClicks === 1 ? '' : 's'}
+                    </span>
                   </span>
                 </div>
                 {isAdmin && (
                   <p className="mt-1 text-xs text-text-muted">Owner: {link.ownerEmail}</p>
+                )}
+                {link.clicks.length > 0 && (
+                  <p className="mt-1 text-xs text-text-muted">
+                    Top:{' '}
+                    {getTopLocations(link.clicks)
+                      .map(([country, count]) => `${country} (${count})`)
+                      .join(' · ')}
+                  </p>
                 )}
                 <div className="mt-2 flex items-center gap-3">
                   <button
