@@ -21,6 +21,7 @@ export default function QrGenerator() {
   const [cornerStyle, setCornerStyle] = useState<CornerSquareType>('square');
   const [fgColor, setFgColor] = useState('#4a3f35');
   const [bgColor, setBgColor] = useState('#fffdf9');
+  const [transparentBg, setTransparentBg] = useState(false);
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [emoji, setEmoji] = useState('');
   const [logoError, setLogoError] = useState('');
@@ -107,7 +108,7 @@ export default function QrGenerator() {
       data: result,
       image: image || undefined,
       dotsOptions: { color: fgColor, type: dotStyle },
-      backgroundOptions: { color: bgColor },
+      backgroundOptions: { color: transparentBg ? 'transparent' : bgColor },
       cornersSquareOptions: { type: cornerStyle },
       imageOptions: { crossOrigin: 'anonymous' as const, margin: 8, imageSize: 0.4 },
       qrOptions: { errorCorrectionLevel: (hasImage ? 'H' : 'M') as 'H' | 'M' },
@@ -122,7 +123,7 @@ export default function QrGenerator() {
     } else {
       qrInstance.current.update(options);
     }
-  }, [result, isSuccess, dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji]);
+  }, [result, isSuccess, dotStyle, cornerStyle, fgColor, bgColor, transparentBg, logoDataUrl, emoji]);
 
   async function download(extension: 'png' | 'svg') {
     qrInstance.current?.download({ name: 'qr-code', extension });
@@ -133,7 +134,14 @@ export default function QrGenerator() {
       const res = await fetch(`/api/links/${slug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji }),
+        body: JSON.stringify({
+          dotStyle,
+          cornerStyle,
+          fgColor,
+          bgColor: transparentBg ? 'transparent' : bgColor,
+          logoDataUrl,
+          emoji,
+        }),
       });
       setSaveState(res.ok ? 'saved' : 'error');
     } catch {
@@ -272,7 +280,7 @@ export default function QrGenerator() {
                 </div>
               </div>
 
-              <div className="flex gap-6">
+              <div className="flex flex-wrap items-center gap-6">
                 <label className="flex items-center gap-2 text-sm text-text">
                   <input
                     type="color"
@@ -282,14 +290,26 @@ export default function QrGenerator() {
                   />
                   Foreground
                 </label>
-                <label className="flex items-center gap-2 text-sm text-text">
+                <label
+                  className={`flex items-center gap-2 text-sm ${transparentBg ? 'text-text-muted' : 'text-text'}`}
+                >
                   <input
                     type="color"
                     value={bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
-                    className="h-8 w-8 cursor-pointer rounded-lg border border-border bg-transparent p-0.5"
+                    disabled={transparentBg}
+                    className="h-8 w-8 cursor-pointer rounded-lg border border-border bg-transparent p-0.5 disabled:cursor-not-allowed disabled:opacity-40"
                   />
                   Background
+                </label>
+                <label className="flex items-center gap-2 text-sm text-text">
+                  <input
+                    type="checkbox"
+                    checked={transparentBg}
+                    onChange={(e) => setTransparentBg(e.target.checked)}
+                    className="h-4 w-4 rounded border-border accent-olive"
+                  />
+                  Transparent background
                 </label>
               </div>
 
