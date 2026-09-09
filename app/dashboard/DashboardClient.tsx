@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import QRCodeStyling, { DotType, CornerSquareType } from 'qr-code-styling';
 import ClickTime from './ClickTime';
 import { signOutAction } from '../actions';
 import QrThumbnail from './QrThumbnail';
@@ -65,6 +66,44 @@ export default function DashboardClient({
       setDeletingId(null);
       setConfirmingId(null);
     }
+  }
+
+  function handleQuickDownload(link: LinkInfo) {
+    const url = `${window.location.origin}/${link.slug}`;
+
+    let image = '';
+    if (link.logoDataUrl) {
+      image = link.logoDataUrl;
+    } else if (link.emoji) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 100;
+      canvas.height = 100;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.font = '80px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(link.emoji, 50, 55);
+        image = canvas.toDataURL();
+      }
+    }
+
+    const qr = new QRCodeStyling({
+      width: 300,
+      height: 300,
+      data: url,
+      image: image || undefined,
+      dotsOptions: {
+        color: link.fgColor || '#4a3f35',
+        type: (link.dotStyle || 'square') as DotType,
+      },
+      backgroundOptions: { color: link.bgColor || '#fffdf9' },
+      cornersSquareOptions: { type: (link.cornerStyle || 'square') as CornerSquareType },
+      imageOptions: { crossOrigin: 'anonymous' as const, margin: 8, imageSize: 0.4 },
+      qrOptions: { errorCorrectionLevel: (image ? 'H' : 'M') as 'H' | 'M' },
+    });
+
+    qr.download({ name: `qr-${link.slug}`, extension: 'png' });
   }
 
   function handleEditSave(id: number, updated: EditableLink) {
@@ -257,6 +296,13 @@ export default function DashboardClient({
                   <p className="mt-1 text-xs text-text-muted">Owner: {link.ownerEmail}</p>
                 )}
                 <div className="mt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDownload(link)}
+                    className="text-xs text-text-muted hover:text-olive hover:underline"
+                  >
+                    Download
+                  </button>
                   <button
                     type="button"
                     onClick={() => setEditingId(editingId === link.id ? null : link.id)}
