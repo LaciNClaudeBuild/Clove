@@ -1,1 +1,49 @@
-import { db } from '@/lib/db'; import { redirect } from 'next/navigation'; function parseDevice(ua: string) { if (/mobile/i.test(ua)) return 'Mobile'; if (/tablet|ipad/i.test(ua)) return 'Tablet'; return 'Desktop'; } function parseBrowser(ua: string) { if (/edg/i.test(ua)) return 'Edge'; if (/chrome/i.test(ua)) return 'Chrome'; if (/safari/i.test(ua) && !/chrome/i.test(ua)) return 'Safari'; if (/firefox/i.test(ua)) return 'Firefox'; return 'Other'; } export async function GET( req: Request, { params }: { params: Promise<{ slug: string }> } ) { const { slug } = await params; const result = await db.query( 'SELECT id, destination_url FROM links WHERE slug = $1', [slug] ); if (result.rows.length === 0) { return new Response('Link not found', { status: 404 }); } const link = result.rows[0]; const ua = req.headers.get('user-agent') || ''; const referrer = req.headers.get('referer') || ''; const country = req.headers.get('x-vercel-ip-country') || ''; const city = req.headers.get('x-vercel-ip-city') || ''; await db.query( 'INSERT INTO clicks (link_id, country, city, referrer, device_type, browser) VALUES ($1, $2, $3, $4, $5, $6)', [link.id, country, city, referrer, parseDevice(ua), parseBrowser(ua)] ).catch(() => {}); redirect(link.destination_url); }
+import { db } from '@/lib/db';
+import { auth } from '@/auth';
+import { NextResponse } from 'next/server';
+
+const MAX_LOGO_LENGTH = 250_000; // roughly 180KB of actual image data, once you account for base64 overhead
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+  const session = await auth();
+
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'You must be signed in.' }, { status: 401 });
+  }
+
+  const linkResult = await db.query('SELECT owner_email FROM links WHERE slug = $1', [slug]);
+
+  if (linkResult.rows.length === 0) {
+    return NextResponse.json({ error: 'Link not found.' }, { status: 404 });
+  }
+
+  const userResult = await db.query('SELECT role FROM users WHERE email = $1', [session.user.email]);
+  const isAdmin = userResult.rows[0]?.role === 'admin';
+  const isOwner = linkResult.rows[0].owner_email === session.user.email;
+
+  if (!isOwner && !isAdmin) {
+    return NextResponse.json({ error: 'You can only edit your own links.' }, { status: 403 });
+  }
+
+  const { dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl, emoji } = await req.json();
+
+  if (logoDataUrl && logoDataUrl.length > MAX_LOGO_LENGTH) {
+    return NextResponse.json(
+      { error: 'That logo is too large. Try a smaller or simpler image.' },
+      { status: 400 }
+    );
+  }
+
+  await db.query(
+    `UPDATE links
+     SET dot_style = $1, corner_style = $2, fg_color = $3, bg_color = $4, logo_data_url = $5, emoji = $6
+     WHERE slug = $7`,
+    [dotStyle, cornerStyle, fgColor, bgColor, logoDataUrl || null, emoji || null, slug]
+  );
+
+  return NextResponse.json({ ok: true });
+}
