@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import ClickTime from './ClickTime';
 import { signOutAction } from '../actions';
+import QrThumbnail from './QrThumbnail';
 
 type ClickInfo = {
   country: string | null;
@@ -18,6 +19,12 @@ type LinkInfo = {
   ownerEmail: string;
   createdAt: string;
   totalClicks: number;
+  dotStyle: string | null;
+  cornerStyle: string | null;
+  fgColor: string | null;
+  bgColor: string | null;
+  logoDataUrl: string | null;
+  emoji: string | null;
   clicks: ClickInfo[];
 };
 
@@ -187,33 +194,44 @@ export default function DashboardClient({
 
         <div className="space-y-3">
           {filtered.map((link) => (
-            <div key={link.id} className="rounded-xl border border-border bg-white p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm text-text">
-                  <span className="font-medium">/{link.slug}</span>{' '}
-                  <span className="text-text-muted">→ {link.destinationUrl}</span>
-                </p>
-                <span className="shrink-0 text-xs text-text-muted">
-                  {link.totalClicks} click{link.totalClicks === 1 ? '' : 's'}
-                </span>
+            <div key={link.id} className="flex gap-3 rounded-xl border border-border bg-white p-4">
+              <QrThumbnail
+                slug={link.slug}
+                dotStyle={link.dotStyle}
+                cornerStyle={link.cornerStyle}
+                fgColor={link.fgColor}
+                bgColor={link.bgColor}
+                logoDataUrl={link.logoDataUrl}
+                emoji={link.emoji}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-sm text-text">
+                    <span className="font-medium">/{link.slug}</span>{' '}
+                    <span className="text-text-muted">→ {link.destinationUrl}</span>
+                  </p>
+                  <span className="shrink-0 text-xs text-text-muted">
+                    {link.totalClicks} click{link.totalClicks === 1 ? '' : 's'}
+                  </span>
+                </div>
+                {isAdmin && (
+                  <p className="mt-1 text-xs text-text-muted">Owner: {link.ownerEmail}</p>
+                )}
+                {link.clicks.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-olive hover:underline">
+                      Recent clicks
+                    </summary>
+                    <ul className="mt-2 space-y-1 border-t border-border pt-2">
+                      {link.clicks.slice(0, 10).map((c, i) => (
+                        <li key={i} className="text-xs text-text-muted">
+                          <ClickTime iso={c.created_at} /> — {c.city || 'Unknown location'}, {c.country || ''} — {c.device_type} / {c.browser}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
-              {isAdmin && (
-                <p className="mt-1 text-xs text-text-muted">Owner: {link.ownerEmail}</p>
-              )}
-              {link.clicks.length > 0 && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-xs text-olive hover:underline">
-                    Recent clicks
-                  </summary>
-                  <ul className="mt-2 space-y-1 border-t border-border pt-2">
-                    {link.clicks.slice(0, 10).map((c, i) => (
-                      <li key={i} className="text-xs text-text-muted">
-                        <ClickTime iso={c.created_at} /> — {c.city || 'Unknown location'}, {c.country || ''} — {c.device_type} / {c.browser}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
             </div>
           ))}
         </div>
