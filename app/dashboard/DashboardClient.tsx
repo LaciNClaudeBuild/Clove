@@ -53,6 +53,9 @@ export default function DashboardClient({
   const [viewFilter, setViewFilter] = useState<'all' | 'mine'>('all');
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [confirmingBulk, setConfirmingBulk] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   async function handleDelete(id: number, slug: string) {
@@ -65,6 +68,37 @@ export default function DashboardClient({
     } finally {
       setDeletingId(null);
       setConfirmingId(null);
+    }
+  }
+
+  function toggleSelected(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true);
+    try {
+      const targets = linksState.filter((l) => selectedIds.has(l.id));
+      const results = await Promise.all(
+        targets.map((l) => fetch(`/api/links/${l.slug}`, { method: 'DELETE' }))
+      );
+      const succeededIds = targets
+        .filter((_, i) => results[i].ok)
+        .map((l) => l.id);
+      setLinksState((prev) => prev.filter((l) => !succeededIds.includes(l.id)));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        succeededIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmingBulk(false);
     }
   }
 
@@ -252,6 +286,66 @@ export default function DashboardClient({
           </div>
         </div>
 
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1">
+          <label className="flex items-center gap-2 text-xs text-text-muted">
+            <input
+              type="checkbox"
+              checked={filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id))}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedIds(new Set(filtered.map((l) => l.id)));
+                } else {
+                  setSelectedIds(new Set());
+                }
+              }}
+              className="h-4 w-4 rounded border-border accent-olive"
+            />
+            Select all
+          </label>
+
+          {selectedIds.size > 0 &&
+            (confirmingBulk ? (
+              <span className="flex items-center gap-2 text-xs">
+                <span className="text-text-muted">
+                  Delete {selectedIds.size} link{selectedIds.size === 1 ? '' : 's'}?
+                </span>
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="text-terracotta-hover hover:underline"
+                >
+                  {bulkDeleting ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingBulk(false)}
+                  className="text-text-muted hover:underline"
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <span className="flex items-center gap-3 text-xs">
+                <span className="text-text-muted">{selectedIds.size} selected</span>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingBulk(true)}
+                  className="text-terracotta-hover hover:underline"
+                >
+                  Delete selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-text-muted hover:underline"
+                >
+                  Clear
+                </button>
+              </span>
+            ))}
+        </div>
+
         {filtered.length === 0 && (
           <div className="rounded-[20px] border border-border bg-cream p-8 text-center">
             <p className="text-sm text-text-muted">
@@ -273,6 +367,12 @@ export default function DashboardClient({
         <div className="space-y-3">
           {filtered.map((link) => (
             <div key={link.id} className="flex gap-3 rounded-xl border border-border bg-white p-4">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(link.id)}
+                onChange={() => toggleSelected(link.id)}
+                className="mt-1 h-4 w-4 shrink-0 self-start rounded border-border accent-olive"
+              />
               <QrThumbnail
                 slug={link.slug}
                 dotStyle={link.dotStyle}
