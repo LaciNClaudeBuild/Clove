@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import ClickTime from './ClickTime';
 import { signOutAction } from '../actions';
 import QrThumbnail from './QrThumbnail';
+import EditLinkPanel, { EditableLink } from './EditLinkPanel';
 
 type ClickInfo = {
   country: string | null;
@@ -51,6 +52,7 @@ export default function DashboardClient({
   const [viewFilter, setViewFilter] = useState<'all' | 'mine'>('all');
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   async function handleDelete(id: number, slug: string) {
     setDeletingId(id);
@@ -63,6 +65,27 @@ export default function DashboardClient({
       setDeletingId(null);
       setConfirmingId(null);
     }
+  }
+
+  function handleEditSave(id: number, updated: EditableLink) {
+    setLinksState((prev) =>
+      prev.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              slug: updated.slug,
+              destinationUrl: updated.destinationUrl,
+              dotStyle: updated.dotStyle,
+              cornerStyle: updated.cornerStyle,
+              fgColor: updated.fgColor,
+              bgColor: updated.bgColor,
+              logoDataUrl: updated.logoDataUrl,
+              emoji: updated.emoji,
+            }
+          : l
+      )
+    );
+    setEditingId(null);
   }
 
   const filtered = useMemo(() => {
@@ -233,7 +256,14 @@ export default function DashboardClient({
                 {isAdmin && (
                   <p className="mt-1 text-xs text-text-muted">Owner: {link.ownerEmail}</p>
                 )}
-                <div className="mt-2">
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(editingId === link.id ? null : link.id)}
+                    className="text-xs text-text-muted hover:text-olive hover:underline"
+                  >
+                    {editingId === link.id ? 'Close' : 'Edit'}
+                  </button>
                   {confirmingId === link.id ? (
                     <span className="inline-flex items-center gap-2 text-xs">
                       <span className="text-text-muted">Delete this link?</span>
@@ -263,6 +293,23 @@ export default function DashboardClient({
                     </button>
                   )}
                 </div>
+
+                {editingId === link.id && (
+                  <EditLinkPanel
+                    link={{
+                      slug: link.slug,
+                      destinationUrl: link.destinationUrl,
+                      dotStyle: link.dotStyle,
+                      cornerStyle: link.cornerStyle,
+                      fgColor: link.fgColor,
+                      bgColor: link.bgColor,
+                      logoDataUrl: link.logoDataUrl,
+                      emoji: link.emoji,
+                    }}
+                    onSave={(updated) => handleEditSave(link.id, updated)}
+                    onCancel={() => setEditingId(null)}
+                  />
+                )}
                 {link.clicks.length > 0 && (
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs text-olive hover:underline">
