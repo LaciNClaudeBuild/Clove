@@ -40,6 +40,11 @@ export default async function Dashboard() {
 
   return (
     <main style={{ padding: 40, fontFamily: 'sans-serif' }}>
+      <div className="mb-6 flex justify-end">
+        <a href="/" className="text-sm text-olive hover:underline">
+          Generator
+        </a>
+      </div>
       <h1>Dashboard</h1>
       {isAdmin && <p style={{ color: '#888', marginBottom: 20 }}>Viewing all links (admin)</p>}
       {links.map((link) => {
