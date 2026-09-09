@@ -34,5 +34,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     shortUrl: `${req.headers.get('origin')}/${slug}`,
+    slug,
   });
 }
